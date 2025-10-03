@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3>News</h3>
+    <a class="btn btn-primary" href="{% url 'search:news_create' %}">Create</a>
+  </div>
+  <hr>
+  {% if news %}
+    <div class="list-group">
+      {% for n in news %}
+        <a class="list-group-item list-group-item-action"
+           href="{% url 'search:news_detail' n.pk %}">
+           <div class="d-flex justify-content-between">
+             <strong>{{ n.headline }}</strong>
+             <small>{{ n.date|date:"Y-m-d H:i" }}</small>
+           </div>
+           <div>Score: {{ n.credibility_score }}/100</div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>No news yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h3>{{ new.headline }}</h3>
+  <p class="text-muted">{{ new.date|date:"Y-m-d H:i" }}</p>
+  <p>{{ new.body }}</p>
+  {% if new.url %}<p><a href="{{ new.url }}" target="_blank">Open link</a></p>{% endif %}
+  <p><strong>Score:</strong> {{ new.credibility_score }}/100</p>
+  <a class="btn btn-outline-primary" href="{% url 'search:news_edit' new.pk %}">Edit</a>
+  <a class="btn btn-outline-danger" href="{% url 'search:news_del' new.pk %}">Delete</a>
+</div>
+{% endblock %}

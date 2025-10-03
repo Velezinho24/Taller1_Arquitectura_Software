@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.db.models import Avg
 from verification.models import AnalyzedNews
-from .services.auth_service import AuthService  # <-- importamos la fachada
+from .services.auth_service import AuthService
 
 
 def signup_view(request):
@@ -15,9 +15,9 @@ def signup_view(request):
         try:
             AuthService.signup(
                 request,
-                request.POST['username'],
-                request.POST['password1'],
-                request.POST['password2']
+                request.POST.get('username', ''),
+                request.POST.get('password1', ''),
+                request.POST.get('password2', '')
             )
             return redirect('search')
         except ValueError as e:
@@ -31,9 +31,17 @@ def login_view(request):
     if request.method == 'GET':
         return render(request, 'login.html', {'form': form})
     else:
-        user = AuthService.signin(request, request.POST['username'], request.POST['password'])
+        user = AuthService.signin(
+            request,
+            request.POST.get('username', ''),
+            request.POST.get('password', '')
+        )
         if user is None:
-            return render(request, 'login.html', {'form': form, 'error': 'Username and password did not match'})
+            return render(
+                request,
+                'login.html',
+                {'form': form, 'error': 'Username and password did not match'}
+            )
         return redirect('search')
 
 
@@ -44,7 +52,18 @@ def logout_view(request):
 
 @login_required
 def dashboard(request):
-    user_news = AnalyzedNews.objects.filter(user=request.user).order_by('-created_at')
+    """
+    Muestra el historial de verificaciones del usuario.
+    Ahora lee a través de la relación:
+      AnalyzedNews -> Article (normalización de modelos)
+    y optimiza consultas con select_related('article', 'article__publisher').
+    """
+    user_news = (
+        AnalyzedNews.objects
+        .filter(user=request.user)
+        .select_related('article', 'article__publisher')
+        .order_by('-created_at')
+    )
 
     total_news = user_news.count()
     average_score = user_news.aggregate(avg_score=Avg('score'))['avg_score'] or 0
