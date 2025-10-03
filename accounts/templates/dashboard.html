@@ -4,7 +4,6 @@
 {% block content %}
 <div class="container my-4">
 
-    <!-- Resumen -->
     <div class="row mb-4">
         <div class="col-md-4">
             <div class="bg-primary text-white p-3 rounded shadow-sm">
@@ -26,7 +25,6 @@
         </div>
     </div>
 
-    <!-- Filtros -->
     <div class="bg-white rounded shadow-sm p-3 mb-4">
         <h5 class="mb-3">{% trans "Filter news" %}</h5>
         <form id="filter-form" class="row gy-2 gx-3 align-items-center">
@@ -49,7 +47,6 @@
         </form>
     </div>
 
-    <!-- Historial -->
     <div class="bg-white p-3 rounded shadow-sm">
         <h4 class="mb-1">{% trans "Verified news history" %}</h4>
         {% if news_list %}
@@ -66,24 +63,44 @@
                 <tbody>
                     {% for news in news_list %}
                     <tr class="{% cycle 'table-light' 'table-secondary' %}">
-                        <td>{{ news.title }}</td>
-                        <td>{{ news.score }}</td>
-                        <td>{{ news.date }}</td>
+                        <td>{{ news.article.title }}</td>
+                        <td class="news-score">{{ news.score }}</td>
+                        <td class="news-date">
+                            {% if news.article.published_at %}
+                                {{ news.article.published_at|date:"Y-m-d H:i" }}
+                            {% else %}
+                                {{ news.created_at|date:"Y-m-d H:i" }}
+                            {% endif %}
+                        </td>
                         <td>
                             <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#analysis-{{ news.id }}">
+                                data-bs-target="#analysis-{{ news.id }}" aria-expanded="false" aria-controls="analysis-{{ news.id }}">
                                 {% trans "View analysis" %}
                             </button>
                         </td>
                     </tr>
+
                     <tr class="collapse" id="analysis-{{ news.id }}">
                         <td colspan="4">
-                            <strong>{% trans "IA result:" %}</strong><br>
-                            <pre class="text-wrap" id="ai-result">{{ news.explanation|linebreaksbr }}</pre>
-                            <br><br>
-                            <button class="btn btn-outline-dark btn-sm mb-3" onclick="copyToClipboard()">
-                                <i class="bi bi-clipboard"></i> {% trans "Copy result" %}
-                            </button>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>{% trans "IA result:" %}</strong>
+                                <div>
+                                    <button class="btn btn-outline-dark btn-sm mb-2 copy-btn"
+                                            data-clipboard-target="ai-result-{{ news.id }}">
+                                        <i class="bi bi-clipboard"></i> {% trans "Copy result" %}
+                                    </button>
+                                    <span id="copy-confirmation-{{ news.id }}" class="text-success" style="display: none; margin-left: 10px;">
+                                        {% trans "Copied!" %}
+                                    </span>
+                                </div>
+                            </div>
+                            <pre class="text-wrap" id="ai-result-{{ news.id }}">{{ news.explanation|linebreaksbr }}</pre>
+
+                            {% if news.article.url %}
+                                <a href="{{ news.article.url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                    {% trans "Open source" %}
+                                </a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -96,7 +113,6 @@
     </div>
 </div>
 
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
@@ -106,7 +122,8 @@
         data: {
             labels: [
                 {% for news in news_list %}
-                    "{{ news.date|date:'Y-m-d H:i' }}"{% if not forloop.last %},{% endif %}
+                    "{% if news.article.published_at %}{{ news.article.published_at|date:'Y-m-d H:i' }}{% else %}{{ news.created_at|date:'Y-m-d H:i' }}{% endif %}"
+                    {% if not forloop.last %},{% endif %}
                 {% endfor %}
             ],
             datasets: [{
@@ -124,9 +141,7 @@
         options: {
             scales: {
                 x: {
-                    ticks: {
-                        maxTicksLimit: 6
-                    }
+                    ticks: { maxTicksLimit: 6 }
                 },
                 y: {
                     beginAtZero: true,
@@ -136,7 +151,6 @@
         }
     });
 
-    // Filtro por fecha y puntaje
     document.addEventListener("DOMContentLoaded", function () {
         const minDateInput = document.getElementById("min-date");
         const maxDateInput = document.getElementById("max-date");
@@ -154,8 +168,12 @@
                 const mainRow = rows[i];
                 const collapseRow = rows[i + 1];
 
-                const dateText = mainRow.querySelector(".news-date").innerText;
-                const scoreText = mainRow.querySelector(".news-score").innerText;
+                const dateCell = mainRow.querySelector(".news-date");
+                const scoreCell = mainRow.querySelector(".news-score");
+                if (!dateCell || !scoreCell) continue;
+
+                const dateText = dateCell.innerText;
+                const scoreText = scoreCell.innerText;
 
                 const rowDate = new Date(dateText);
                 const rowScore = parseInt(scoreText);
@@ -167,7 +185,7 @@
                     (!maxScore || rowScore <= maxScore);
 
                 mainRow.style.display = show ? "" : "none";
-                collapseRow.style.display = show ? "" : "none";
+                if (collapseRow) collapseRow.style.display = show ? "" : "none";
             }
         }
 
@@ -175,17 +193,23 @@
         maxDateInput.addEventListener("input", filterNews);
         minScoreInput.addEventListener("input", filterNews);
         maxScoreInput.addEventListener("input", filterNews);
-    });
 
-    function copyToClipboard() {
-        const text = document.getElementById("ai-result").innerText;
-        navigator.clipboard.writeText(text).then(function () {
-            const confirmation = document.getElementById("copy-confirmation");
-            confirmation.style.display = "inline";
-            setTimeout(() => confirmation.style.display = "none", 2000);
-        }, function (err) {
-            console.error("Error copying text: ", err);
+        document.querySelectorAll(".copy-btn").forEach(btn => {
+            btn.addEventListener("click", function () {
+                const targetId = this.getAttribute("data-clipboard-target");
+                const textEl = document.getElementById(targetId);
+                if (!textEl) return;
+
+                const text = textEl.innerText;
+                navigator.clipboard.writeText(text).then(() => {
+                    const confirmation = document.getElementById("copy-confirmation-" + targetId.replace("ai-result-", ""));
+                    if (confirmation) {
+                        confirmation.style.display = "inline";
+                        setTimeout(() => confirmation.style.display = "none", 2000);
+                    }
+                }).catch(err => console.error("Error copying text: ", err));
+            });
         });
-    }
+    });
 </script>
 {% endblock %}

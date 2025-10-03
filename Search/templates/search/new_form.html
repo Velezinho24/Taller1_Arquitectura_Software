@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h3>{{ view.object|yesno:"Edit news,Create news" }}</h3>
+  <form method="post">{% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn btn-secondary" href="{% url 'search:news_list' %}">Cancel</a>
+  </form>
+</div>
+{% endblock %}
